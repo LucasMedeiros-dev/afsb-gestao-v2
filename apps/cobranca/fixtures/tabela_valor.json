@@ -1,0 +1,242 @@
+[
+  {
+    "model": "cobranca.tabelavalor",
+    "pk": "91ff7db3-5f12-5b60-98a3-7e7b91bf3fb7",
+    "fields": {
+      "modalidade": "mensal",
+      "qtd_lojas": 1,
+      "valor_cheio": "125.00",
+      "valor_desconto": "100.00",
+      "data_criacao": "2026-09-29T00:00:00Z",
+      "data_atualizacao": "2026-09-29T00:00:00Z"
+    }
+  },
+  {
+    "model": "cobranca.tabelavalor",
+    "pk": "29ba4f88-9b08-5c33-80a9-9bc28df94b28",
+    "fields": {
+      "modalidade": "mensal",
+      "qtd_lojas": 2,
+      "valor_cheio": "180.00",
+      "valor_desconto": "144.00",
+      "data_criacao": "2026-09-29T00:00:00Z",
+      "data_atualizacao": "2026-09-29T00:00:00Z"
+    }
+  },
+  {
+    "model": "cobranca.tabelavalor",
+    "pk": "7b47867a-9844-5acd-b6b6-3219b2e23f83",
+    "fields": {
+      "modalidade": "mensal",
+      "qtd_lojas": 3,
+      "valor_cheio": "270.00",
+      "valor_desconto": "216.00",
+      "data_criacao": "2026-09-29T00:00:00Z",
+      "data_atualizacao": "2026-09-29T00:00:00Z"
+    }
+  },
+  {
+    "model": "cobranca.tabelavalor",
+    "pk": "e552b682-f418-58c7-8f22-77837520bf69",
+    "fields": {
+      "modalidade": "mensal",
+      "qtd_lojas": 4,
+      "valor_cheio": "350.00",
+      "valor_desconto": "280.00",
+      "data_criacao": "2026-09-29T00:00:00Z",
+      "data_atualizacao": "2026-09-29T00:00:00Z"
+    }
+  },
+  {
+    "model": "cobranca.tabelavalor",
+    "pk": "a8b70454-b0b6-5b46-9745-cc6909f5d58b",
+    "fields": {
+      "modalidade": "mensal",
+      "qtd_lojas": 5,
+      "valor_cheio": "375.00",
+      "valor_desconto": "300.00",
+      "data_criacao": "2026-09-29T00:00:00Z",
+      "data_atualizacao": "2026-09-29T00:00:00Z"
+    }
+  },
+  {
+    "model": "cobranca.tabelavalor",
+    "pk": "2d29800c-5cad-5e0b-84e8-0ecebad8128e",
+    "fields": {
+      "modalidade": "mensal",
+      "qtd_lojas": 6,
+      "valor_cheio": "375.00",
+      "valor_desconto": "300.00",
+      "data_criacao": "2026-09-29T00:00:00Z",
+      "data_atualizacao": "2026-09-29T00:00:00Z"
+    }
+  },
+  {
+    "model": "cobranca.tabelavalor",
+    "pk": "a8feb556-7cc4-596f-bdee-c3e19fde35fe",
+    "fields": {
+      "modalidade": "mensal",
+      "qtd_lojas": 7,
+      "valor_cheio": "437.50",
+      "valor_desconto": "350.00",
+      "data_criacao": "2026-09-29T00:00:00Z",
+      "data_atualizacao": "2026-09-29T00:00:00Z"
+    }
+  },
+  {
+    "model": "cobranca.tabelavalor",
+    "pk": "916e1b9e-cb7a-56fe-a3d3-cc55320036fc",
+    "fields": {
+      "modalidade": "mensal",
+      "qtd_lojas": 8,
+      "valor_cheio": "500.00",
+      "valor_desconto": "400.00",
+      "data_criacao": "2026-09-29T00:00:00Z",
+      "data_atualizacao": "2026-09-29T00:00:00Z"
+    }
+  },
+  {
+    "model": "cobranca.tabelavalor",
+    "pk": "abcc19be-9dda-599a-845f-40bf0c97b90b",
+    "fields": {
+      "modalidade": "mensal",
+      "qtd_lojas": 9,
+      "valor_cheio": "562.50",
+      "valor_desconto": "450.00",
+      "data_criacao": "2026-09-29T00:00:00Z",
+      "data_atualizacao": "2026-09-29T00:00:00Z"
+    }
+  },
+  {
+    "model": "cobranca.tabelavalor",
+    "pk": "f041b9fc-173d-5987-8cd4-950d8360ac65",
+    "fields": {
+      "modalidade": "mensal",
+      "qtd_lojas": 10,
+      "valor_cheio": "625.00",
+      "valor_desconto": "500.00",
+      "data_criacao": "2026-09-29T00:00:00Z",
+      "data_atualizacao": "2026-09-29T00:00:00Z"
+    }
+  },
+  {
+    "model": "cobranca.tabelavalor",
+    "pk": "3affc91a-cfec-547c-8f51-e04d8945cf88",
+    "fields": {
+      "modalidade": "anual",
+      "qtd_lojas": 1,
+      "valor_cheio": "1200.00",
+      "valor_desconto": null,
+      "data_criacao": "2026-09-29T00:00:00Z",
+      "data_atualizacao": "2026-09-29T00:00:00Z"
+    }
+  },
+  {
+    "model": "cobranca.tabelavalor",
+    "pk": "b7822887-6862-5b85-b1d2-31726efee62a",
+    "fields": {
+      "modalidade": "anual",
+      "qtd_lojas": 2,
+      "valor_cheio": "1728.00",
+      "valor_desconto": null,
+      "data_criacao": "2026-09-29T00:00:00Z",
+      "data_atualizacao": "2026-09-29T00:00:00Z"
+    }
+  },
+  {
+    "model": "cobranca.tabelavalor",
+    "pk": "e6cae39e-ede1-5a0a-ad70-c0a56e4cb9e5",
+    "fields": {
+      "modalidade": "anual",
+      "qtd_lojas": 3,
+      "valor_cheio": "2592.00",
+      "valor_desconto": null,
+      "data_criacao": "2026-09-29T00:00:00Z",
+      "data_atualizacao": "2026-09-29T00:00:00Z"
+    }
+  },
+  {
+    "model": "cobranca.tabelavalor",
+    "pk": "7931d9b7-3542-51a8-9b44-0ce801a5a453",
+    "fields": {
+      "modalidade": "anual",
+      "qtd_lojas": 4,
+      "valor_cheio": "3360.00",
+      "valor_desconto": null,
+      "data_criacao": "2026-09-29T00:00:00Z",
+      "data_atualizacao": "2026-09-29T00:00:00Z"
+    }
+  },
+  {
+    "model": "cobranca.tabelavalor",
+    "pk": "82532681-f699-59a4-b6fb-d2913808213b",
+    "fields": {
+      "modalidade": "anual",
+      "qtd_lojas": 5,
+      "valor_cheio": "3600.00",
+      "valor_desconto": null,
+      "data_criacao": "2026-09-29T00:00:00Z",
+      "data_atualizacao": "2026-09-29T00:00:00Z"
+    }
+  },
+  {
+    "model": "cobranca.tabelavalor",
+    "pk": "2fbf0d59-81ea-5d1b-816d-ee2fe39232af",
+    "fields": {
+      "modalidade": "anual",
+      "qtd_lojas": 6,
+      "valor_cheio": "3600.00",
+      "valor_desconto": null,
+      "data_criacao": "2026-09-29T00:00:00Z",
+      "data_atualizacao": "2026-09-29T00:00:00Z"
+    }
+  },
+  {
+    "model": "cobranca.tabelavalor",
+    "pk": "2c13f2a0-1ac9-5548-b9da-43640573df28",
+    "fields": {
+      "modalidade": "anual",
+      "qtd_lojas": 7,
+      "valor_cheio": "4200.00",
+      "valor_desconto": null,
+      "data_criacao": "2026-09-29T00:00:00Z",
+      "data_atualizacao": "2026-09-29T00:00:00Z"
+    }
+  },
+  {
+    "model": "cobranca.tabelavalor",
+    "pk": "d8f9fee6-83e5-5eb4-8fa3-b3e1443ee41f",
+    "fields": {
+      "modalidade": "anual",
+      "qtd_lojas": 8,
+      "valor_cheio": "4800.00",
+      "valor_desconto": null,
+      "data_criacao": "2026-09-29T00:00:00Z",
+      "data_atualizacao": "2026-09-29T00:00:00Z"
+    }
+  },
+  {
+    "model": "cobranca.tabelavalor",
+    "pk": "24f2e995-a5ea-5eb3-b0ce-58e2dd194868",
+    "fields": {
+      "modalidade": "anual",
+      "qtd_lojas": 9,
+      "valor_cheio": "5400.00",
+      "valor_desconto": null,
+      "data_criacao": "2026-09-29T00:00:00Z",
+      "data_atualizacao": "2026-09-29T00:00:00Z"
+    }
+  },
+  {
+    "model": "cobranca.tabelavalor",
+    "pk": "a1ca5421-91d9-502e-b536-57e388182dd0",
+    "fields": {
+      "modalidade": "anual",
+      "qtd_lojas": 10,
+      "valor_cheio": "6000.00",
+      "valor_desconto": null,
+      "data_criacao": "2026-09-29T00:00:00Z",
+      "data_atualizacao": "2026-09-29T00:00:00Z"
+    }
+  }
+]
