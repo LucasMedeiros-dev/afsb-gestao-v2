@@ -37,3 +37,6 @@ export const SCHEMA_ENDERECO = {
   postalCode: ENDERECO.cep,
   addressCountry: 'BR',
 } as const;
+
+/** WhatsApp de atendimento (site, rodapé e suporte de acesso). */
+export const WHATSAPP_URL = 'https://wa.me/5511993414925';

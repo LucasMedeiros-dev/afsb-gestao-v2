@@ -1,4 +1,4 @@
-from rest_framework import viewsets
+from rest_framework import filters, viewsets
 
 from apps.utils.custom_permissions import AdminOrReadOnly
 
@@ -12,4 +12,6 @@ class NoticiaViewSet(viewsets.ModelViewSet):
     """
     queryset = Noticia.objects.all()
     serializer_class = NoticiaSerializer
+    filter_backends = (filters.SearchFilter,)
+    search_fields = ('titulo', 'subtitulo')
     permission_classes = (AdminOrReadOnly,)

@@ -1,10 +1,8 @@
 services:
   backend:
     build: ./backend
-    environment:
-      DJANGO_DEBUG: "1"
-      # "backend" é o host que o nginx do frontend usa no proxy.
-      DJANGO_ALLOWED_HOSTS: "localhost,127.0.0.1,backend"
+    # Configuração e segredos: .env na raiz (modelo em .env.example).
+    env_file: .env
     volumes:
       # Código e db.sqlite3 do host: runserver recarrega ao editar.
       - ./backend:/app

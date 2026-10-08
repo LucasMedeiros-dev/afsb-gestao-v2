@@ -11,6 +11,7 @@ class Documento(DefaultModel):
         DOCUMENTO = 'documento', 'Documento'
         PALESTRA = 'palestra', 'Palestra'
         ATA_DE_REUNIAO = 'ata_de_reuniao', 'Ata de Reunião'
+        VIDEO = 'video', 'Vídeo'
 
     titulo = models.CharField('título', max_length=100)
     arquivo = models.FileField('arquivo', upload_to='documentos/')

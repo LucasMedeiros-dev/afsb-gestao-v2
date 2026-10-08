@@ -4,3 +4,6 @@ venv/
 __pycache__/
 *.py[cod]
 db.sqlite3
+
+# Segredos: entram por variável de ambiente, nunca na imagem
+.env

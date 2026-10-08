@@ -1,7 +1,7 @@
 from django.urls import path
 from rest_framework.routers import DefaultRouter
 
-from .views import FranquiaViewSet, LojasPorEstadoView
+from .views import ConsultaCnpjView, FranquiaViewSet, LojasPorEstadoView, MinhasFranquiasView
 
 router = DefaultRouter()
 
@@ -10,4 +10,6 @@ router.register(r"", FranquiaViewSet, basename="franquia")
 # Antes do router: senão "por-estado" casa como pk do detalhe.
 urlpatterns = [
     path("por-estado/", LojasPorEstadoView.as_view(), name="franquia-por-estado"),
+    path("minhas/", MinhasFranquiasView.as_view(), name="franquia-minhas"),
+    path("consulta-cnpj/<str:cnpj>/", ConsultaCnpjView.as_view(), name="franquia-consulta-cnpj"),
 ] + router.urls

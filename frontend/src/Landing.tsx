@@ -1,6 +1,6 @@
 import { lazy, Suspense, useEffect, useRef, useState, type ChangeEvent, type FormEvent } from 'react';
 import * as api from './api';
-import { CNPJ } from './dadosInstitucionais';
+import { CNPJ, WHATSAPP_URL } from './dadosInstitucionais';
 import NoticiasEventos from './NoticiasEventos';
 import { SCHEMA_ORG, SITE, useSeo } from './seo';
 
@@ -126,9 +126,12 @@ export default function Landing() {
   const [formValues, setFormValues] = useState({
     nome: '',
     whatsapp: '',
+    cpf: '',
     email: '',
     senha: '',
   });
+  const [errosCadastro, setErrosCadastro] = useState<Record<string, string>>({});
+  const [enviandoCadastro, setEnviandoCadastro] = useState(false);
 
   // Estado do Carrossel Hero
   const [slideAtual, setSlideAtual] = useState(0);
@@ -216,9 +219,31 @@ export default function Landing() {
     setFormValues((prev) => ({ ...prev, whatsapp: formatado }));
   };
 
-  const handleFormSubmit = (e: FormEvent) => {
+  const handleCpfChange = (e: ChangeEvent<HTMLInputElement>) => {
+    const d = e.target.value.replace(/\D/g, '').slice(0, 11);
+    const cpf = d
+      .replace(/(\d{3})(\d)/, '$1.$2')
+      .replace(/(\d{3})(\d)/, '$1.$2')
+      .replace(/(\d{3})(\d{1,2})$/, '$1-$2');
+    setFormValues((prev) => ({ ...prev, cpf }));
+  };
+
+  // Pré-cadastro: cria o usuário "aguardando validação"; a diretoria aprova no painel.
+  const handleFormSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    setCadastroEnviado(true);
+    setEnviandoCadastro(true);
+    setErrosCadastro({});
+    try {
+      await api.preCadastro(formValues);
+      setCadastroEnviado(true);
+      setFormValues({ nome: '', whatsapp: '', cpf: '', email: '', senha: '' });
+    } catch (falha) {
+      setErrosCadastro(
+        falha instanceof api.ErroCadastro ? falha.campos : { geral: 'Não foi possível enviar. Tente novamente.' },
+      );
+    } finally {
+      setEnviandoCadastro(false);
+    }
   };
 
   return (
@@ -264,6 +289,12 @@ export default function Landing() {
           </nav>
 
           <div className="flex items-center gap-4">
+            <a
+              className="hidden sm:inline-flex items-center justify-center px-4 py-2.5 rounded-xl font-label-lg text-label-lg text-on-surface-variant bg-surface-container-low hover:bg-surface-container hover:text-on-surface transition-all"
+              href="/login"
+            >
+              Entrar
+            </a>
             <button
               className="inline-flex items-center justify-center px-5 py-2.5 rounded-xl font-label-lg text-label-lg text-on-primary bg-primary hover:bg-secondary-container hover:text-on-secondary-container transition-all shadow-[0_2px_4px_rgba(0,101,44,0.15)]"
               onClick={abrirModal}
@@ -622,7 +653,7 @@ export default function Landing() {
                         <h4 className="font-headline-sm text-headline-sm text-on-surface font-bold">
                           {p.nome}
                         </h4>
-                        <p className="font-body-sm text-body-sm text-on-surface-variant leading-relaxed line-clamp-3">
+                        <p className="font-body-sm text-body-sm text-on-surface-variant leading-relaxed line-clamp-3 whitespace-pre-line">
                           {p.beneficios}
                         </p>
                       </div>
@@ -661,22 +692,34 @@ export default function Landing() {
                 </p>
               </div>
 
-              {/* Grid de Representantes */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                {membros.length > 0 ? (
-                  membros.map((membro) => (
+              {/* Carrossel contínuo: a lista vai duplicada e a esteira anda -50%,
+                  então o fim emenda no começo sem salto. 4 por vez no desktop. */}
+              {membros.length > 0 ? (
+                <div className="overflow-hidden -mx-3 py-2">
+                  <div
+                    className="flex w-max hover:[animation-play-state:paused] motion-reduce:!animate-none"
+                    style={{
+                      animation: `esteira-membros ${membros.length * 5}s linear infinite`,
+                      animationPlayState: autoplayParado ? 'paused' : undefined,
+                    }}
+                  >
+                {[...membros, ...membros].map((membro, indice) => (
+                  <div
+                    key={`${membro.id}-${indice}`}
+                    aria-hidden={indice >= membros.length}
+                    className="shrink-0 px-3 w-[85vw] sm:w-[calc((min(100vw,1280px)-1.5rem)/2)] lg:w-[calc((min(100vw,1280px)-4.5rem)/4)]"
+                  >
                     <div
-                      key={membro.id}
-                      className="w-full max-w-sm mx-auto sm:max-w-none rounded-2xl bg-surface overflow-hidden shadow-sm flex flex-col"
+                      className="w-full rounded-2xl bg-surface overflow-hidden shadow-sm flex flex-col"
                     >
                       {/* Retrato grande em vez de avatar de 96px: a foto é
                           alta resolução e, encolhida demais, serrilha. O
                           enquadramento pelo topo pega rosto e ombros. */}
-                      <div className="aspect-square bg-surface-container-high">
+                      <div className="relative aspect-[4/5] overflow-hidden bg-surface-container-high">
                         {membro.foto ? (
                           <img
                             alt={membro.nome}
-                            className="w-full h-full object-cover object-top"
+                            className="absolute inset-0 w-full h-full object-cover object-top"
                             decoding="async"
                             loading="lazy"
                             src={membro.foto}
@@ -698,13 +741,15 @@ export default function Landing() {
                         )}
                       </div>
                     </div>
-                  ))
-                ) : (
-                  <p className="text-on-surface-variant py-4 text-body-md col-span-full text-center">
-                    Nenhum membro cadastrado no momento.
-                  </p>
-                )}
-              </div>
+                  </div>
+                ))}
+                  </div>
+                </div>
+              ) : (
+                <p className="text-on-surface-variant py-4 text-body-md text-center">
+                  Nenhum membro cadastrado no momento.
+                </p>
+              )}
             </div>
           </section>
 
@@ -753,7 +798,7 @@ export default function Landing() {
       <a
         aria-label="Fale conosco pelo WhatsApp"
         className="fixed bottom-8 right-8 z-50 w-14 h-14 rounded-full bg-[#25D366] text-white flex items-center justify-center shadow-[0_10px_15px_-3px_rgba(37,211,102,0.35)] hover:scale-105 active:scale-95 transition-transform"
-        href="https://wa.me/5511993414925"
+        href={WHATSAPP_URL}
         rel="noopener noreferrer"
         target="_blank"
       >
@@ -839,6 +884,28 @@ export default function Landing() {
                         onChange={handleWhatsappChange}
                       />
                     </div>
+                    {errosCadastro.whatsapp && <p className="mt-1 text-[0.8rem] text-error">{errosCadastro.whatsapp}</p>}
+                  </div>
+
+                  <div>
+                    <label className="block font-label-md text-label-md text-on-surface-variant mb-1 font-semibold">
+                      CPF
+                    </label>
+                    <div className="relative">
+                      <span className="material-symbols-outlined absolute left-3.5 top-3 text-[20px] text-tertiary">
+                        badge
+                      </span>
+                      <input
+                        required
+                        className="w-full pl-11 pr-4 py-2.5 rounded-xl bg-surface-container-low text-on-surface font-body-sm text-body-sm outline-none focus:bg-surface-container-lowest focus:ring-2 focus:ring-primary shadow-sm border border-transparent focus:border-primary transition-all"
+                        inputMode="numeric"
+                        name="cpf"
+                        placeholder="000.000.000-00"
+                        value={formValues.cpf}
+                        onChange={handleCpfChange}
+                      />
+                    </div>
+                    {errosCadastro.cpf && <p className="mt-1 text-[0.8rem] text-error">{errosCadastro.cpf}</p>}
                   </div>
 
                   <div>
@@ -861,6 +928,7 @@ export default function Landing() {
                         }
                       />
                     </div>
+                    {errosCadastro.email && <p className="mt-1 text-[0.8rem] text-error">{errosCadastro.email}</p>}
                   </div>
 
                   <div>
@@ -884,14 +952,21 @@ export default function Landing() {
                         }
                       />
                     </div>
+                    {errosCadastro.senha && <p className="mt-1 text-[0.8rem] text-error">{errosCadastro.senha}</p>}
                   </div>
 
                   <div className="pt-2 flex flex-col space-y-3">
+                    {(errosCadastro.geral || errosCadastro.nome) && (
+                      <p className="rounded-xl bg-error-container text-on-error-container px-4 py-2.5 text-[0.85rem]" role="alert">
+                        {errosCadastro.geral || errosCadastro.nome}
+                      </p>
+                    )}
                     <button
-                      className="w-full py-3.5 rounded-xl bg-primary hover:bg-primary-container text-on-primary font-label-lg text-label-lg font-bold shadow-md transition-all active:scale-[0.99]"
+                      className="w-full py-3.5 rounded-xl bg-primary hover:bg-primary-container text-on-primary font-label-lg text-label-lg font-bold shadow-md transition-all active:scale-[0.99] disabled:opacity-60"
+                      disabled={enviandoCadastro}
                       type="submit"
                     >
-                      Enviar Pré-Cadastro
+                      {enviandoCadastro ? 'Enviando…' : 'Enviar Pré-Cadastro'}
                     </button>
                     <div className="flex items-start gap-2 pt-1 text-on-surface-variant">
                       <span className="material-symbols-outlined text-[18px] text-primary shrink-0 mt-0.5">
@@ -995,7 +1070,7 @@ export default function Landing() {
                   </span>
                   <a
                     className="font-body-sm text-body-sm text-slate-400 hover:text-white transition-colors"
-                    href="https://wa.me/5511993414925"
+                    href={WHATSAPP_URL}
                     rel="noopener noreferrer"
                     target="_blank"
                   >
@@ -1027,7 +1102,7 @@ export default function Landing() {
 
           <div className="pt-8 mt-8 border-t border-slate-800 flex flex-col md:flex-row items-center justify-between gap-4">
             <p className="font-body-sm text-body-sm text-slate-500 text-center md:text-left">
-              &copy; 2024 AFSB - Associação dos Franqueados Subway do Brasil. Todos os direitos
+              &copy; 2026 AFSB - Associação dos Franqueados Subway do Brasil. Todos os direitos
               reservados.
             </p>
             <span className="font-body-sm text-body-sm text-slate-500">CNPJ {CNPJ}</span>

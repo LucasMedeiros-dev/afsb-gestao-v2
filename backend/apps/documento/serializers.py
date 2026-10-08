@@ -6,4 +6,4 @@ from .models import Documento
 class DocumentoSerializer(serializers.ModelSerializer):
     class Meta:
         model = Documento
-        fields = ('id', 'titulo', 'arquivo', 'criado_em', 'atualizado_em')
+        fields = ('id', 'titulo', 'tipo', 'arquivo', 'criado_em', 'atualizado_em')

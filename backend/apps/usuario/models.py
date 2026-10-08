@@ -36,9 +36,19 @@ class Usuario(AbstractUser):
     status = models.CharField('status', max_length=20, choices=Status.choices, default=Status.AGUARDANDO_VALIDACAO)
     data_admissao = models.DateField('data de admissão', null=True, blank=True)
 
+    # Login por e-mail (inclusive no obtain token do DRF); username segue obrigatório.
+    USERNAME_FIELD = 'email'
+    REQUIRED_FIELDS = ['username']
+
     class Meta:
         verbose_name = 'usuário'
         verbose_name_plural = 'usuários'
+
+    def save(self, *args, **kwargs):
+        # Acesso ao painel/API de admin é por is_staff; cargo + status são a fonte da
+        # verdade. Admin inativo/bloqueado perde o painel na hora (mesmo com token).
+        self.is_staff = self.is_superuser or (self.cargo == self.Cargos.ADMIN and self.status == self.Status.ATIVO)
+        super().save(*args, **kwargs)
 
     def __str__(self):
         nome = self.get_full_name() or self.email

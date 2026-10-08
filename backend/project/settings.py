@@ -13,18 +13,48 @@ https://docs.djangoproject.com/en/6.1/ref/settings/
 import os
 from pathlib import Path
 
+from django.core.exceptions import ImproperlyConfigured
+
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+
+def _carregar_env(caminho):
+    """
+    Lê o .env da raiz do repositório (CHAVE=valor, aspas opcionais) sem
+    sobrescrever o que já vem do ambiente. No compose ele chega por env_file;
+    fora dele (venv local), por aqui. Aspas simples evitam que o '$' da chave
+    do Asaas seja interpretado pelo shell/compose.
+    """
+    if not caminho.exists():
+        return
+    for linha in caminho.read_text(encoding='utf-8').splitlines():
+        linha = linha.strip()
+        if not linha or linha.startswith('#') or '=' not in linha:
+            continue
+        chave, valor = (parte.strip() for parte in linha.split('=', 1))
+        if len(valor) >= 2 and valor[0] == valor[-1] and valor[0] in ('"', "'"):
+            valor = valor[1:-1]
+        os.environ.setdefault(chave, valor)
+
+
+_carregar_env(BASE_DIR.parent / '.env')
+
+
+def _env_bool(nome, padrao='0'):
+    return os.environ.get(nome, padrao).strip().lower() in ('1', 'true', 'sim', 'yes')
 
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/6.1/howto/deployment/checklist/
 
-# SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure--q&20(6hdk649(g1018l&bkt3(#l#lohi5r=9&x@sc(!#w6=a^'
-
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.environ.get('DJANGO_DEBUG', '1') == '1'
+DEBUG = _env_bool('DJANGO_DEBUG', '0')
+
+# SECURITY WARNING: keep the secret key used in production secret!
+SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', '')
+if not SECRET_KEY:
+    raise ImproperlyConfigured('Defina DJANGO_SECRET_KEY no .env da raiz (ver .env.example).')
 
 # Vazio + DEBUG libera localhost; no compose o nginx chega como "backend".
 ALLOWED_HOSTS = [h for h in os.environ.get('DJANGO_ALLOWED_HOSTS', '').split(',') if h]
@@ -43,6 +73,7 @@ DEFAULT_APPS = [
 
 THIRD_PARTY_APPS = [
     "rest_framework",
+    "rest_framework.authtoken",
 ]
 
 OUR_APPS = [
@@ -142,8 +173,19 @@ STATIC_URL = 'static/'
 # Email
 # https://docs.djangoproject.com/en/6.1/topics/email/#topic-email-configuration
 
+# Sem EMAIL_HOST o e-mail só aparece no console (dev). Com host, sai por SMTP.
+_EMAIL_HOST = os.environ.get('EMAIL_HOST', '')
 MAILERS = {
     'default': {
+        'BACKEND': 'django.core.mail.backends.smtp.EmailBackend',
+        'OPTIONS': {
+            'host': _EMAIL_HOST,
+            'port': int(os.environ.get('EMAIL_PORT', '587')),
+            'username': os.environ.get('EMAIL_HOST_USER', ''),
+            'password': os.environ.get('EMAIL_HOST_PASSWORD', ''),
+            'use_tls': _env_bool('EMAIL_USE_TLS', '1'),
+        },
+    } if _EMAIL_HOST else {
         'BACKEND': 'django.core.mail.backends.console.EmailBackend',
     },
 }
@@ -155,14 +197,41 @@ STORAGES = {
     "default": {
         "BACKEND": "storages.backends.s3.S3Storage",
             "OPTIONS": {
-            "bucket_name": "afsb-lm",
-            "region_name": "us-east-005",
-            "endpoint_url": "https://s3.us-east-005.backblazeb2.com",
-            "access_key": "005d8131f425cd70000000001",
-            "secret_key": "K0054Xu6tEX6KH+a2YXrXwoSN/fzOlM",
+            "bucket_name": os.environ.get("B2_BUCKET_NAME", ""),
+            "region_name": os.environ.get("B2_REGION", ""),
+            "endpoint_url": os.environ.get("B2_ENDPOINT_URL", ""),
+            "access_key": os.environ.get("B2_ACCESS_KEY", ""),
+            "secret_key": os.environ.get("B2_SECRET_KEY", ""),
         },
     },
     "staticfiles": {
         "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
     },
 }
+
+# API
+# Token no header (painel/SPA) e sessão (Django admin / API navegável).
+# Padrão fechado: só staff. Endpoint público ou de associado declara a própria permissão.
+
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': (
+        'rest_framework.authentication.TokenAuthentication',
+        'rest_framework.authentication.SessionAuthentication',
+    ),
+    'DEFAULT_PERMISSION_CLASSES': ('rest_framework.permissions.IsAdminUser',),
+    # Rotas públicas que criam/validam acesso: limita tentativas por IP.
+    'DEFAULT_THROTTLE_RATES': {'cadastro': '10/hour', 'login': '30/hour'},
+}
+
+
+# Asaas
+# Sem chave, nada é enviado ao Asaas: reemissão e baixa avisam que falta configurar.
+
+ASAAS_API_KEY = os.environ.get('ASAAS_API_KEY', '')
+ASAAS_BASE_URL = os.environ.get('ASAAS_BASE_URL', 'https://api-sandbox.asaas.com/v3')
+# Trava geral: nada é emitido no Asaas (geração mensal, reemissão, "pagar") até a
+# AFSB comunicar os associados sobre a troca de sistema. Liberar com "1".
+COBRANCA_EMISSAO_LIBERADA = _env_bool('COBRANCA_EMISSAO_LIBERADA', '0')
+# Token que o Asaas envia no header asaas-access-token dos webhooks.
+ASAAS_WEBHOOK_TOKEN = os.environ.get('ASAAS_WEBHOOK_TOKEN', '')
+DEFAULT_FROM_EMAIL = os.environ.get('DJANGO_DEFAULT_FROM_EMAIL', 'AFSB <nao-responda@afsb.com.br>')
