@@ -59,6 +59,10 @@ if not SECRET_KEY:
 # Vazio + DEBUG libera localhost; no compose o nginx chega como "backend".
 ALLOWED_HOSTS = [h for h in os.environ.get('DJANGO_ALLOWED_HOSTS', '').split(',') if h]
 
+# Atrás do Caddy (HTTPS): origens aceitas no CSRF (admin/sessão) e esquema real.
+CSRF_TRUSTED_ORIGINS = [o for o in os.environ.get('DJANGO_CSRF_TRUSTED_ORIGINS', '').split(',') if o]
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+
 
 # Application definition
 
