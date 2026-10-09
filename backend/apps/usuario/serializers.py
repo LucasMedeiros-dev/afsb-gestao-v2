@@ -1,11 +1,10 @@
 import re
 
+from apps.franquia.models import Franquia
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.utils import timezone
 from rest_framework import serializers
-
-from apps.franquia.models import Franquia
 
 from .models import AprovacaoCadastro, Usuario
 
@@ -70,26 +69,52 @@ class UsuarioSerializer(serializers.ModelSerializer):
         return usuario
 
 
+def normalizar_whatsapp(valor):
+    d = re.sub(r'\D', '', valor)
+    d = d[2:] if len(d) == 13 and d.startswith('55') else d
+    if not re.fullmatch(r'\d{2}9\d{8}', d):
+        raise serializers.ValidationError('Informe o celular com DDD, ex.: (11) 99999-8888.')
+    return f'+55{d}'
+
+
 class MeusDadosSerializer(serializers.ModelSerializer):
-    """O que o associado vê de si mesmo (somente leitura)."""
-    nome = serializers.SerializerMethodField()
-    status_display = serializers.CharField(source='get_status_display')
-    tipo_comunicacao_display = serializers.CharField(source='get_tipo_comunicacao_display')
+    """
+    O que o associado vê de si mesmo. Edita nome, e-mail de acesso, WhatsApp e
+    canal de comunicação; CPF, nº de associado e status seguem com a AFSB.
+    """
+    nome = serializers.CharField(source='get_full_name', max_length=150)
+    whatsapp = serializers.CharField()  # sem o validador do model: aceita com máscara e normaliza
+    status_display = serializers.CharField(source='get_status_display', read_only=True)
+    tipo_comunicacao_display = serializers.CharField(source='get_tipo_comunicacao_display', read_only=True)
     qtd_lojas = serializers.SerializerMethodField()
 
     class Meta:
         model = Usuario
         fields = (
             'nome', 'email', 'cpf', 'whatsapp', 'nro_associado', 'status', 'status_display',
-            'tipo_comunicacao_display', 'data_admissao', 'qtd_lojas',
+            'tipo_comunicacao', 'tipo_comunicacao_display', 'data_admissao', 'qtd_lojas',
         )
-        read_only_fields = fields
-
-    def get_nome(self, obj):
-        return obj.get_full_name() or obj.email
+        read_only_fields = ('cpf', 'nro_associado', 'status', 'data_admissao')
 
     def get_qtd_lojas(self, obj):
         return obj.franquias.count()
+
+    def validate_email(self, valor):
+        valor = valor.strip().lower()
+        if Usuario.objects.filter(email__iexact=valor).exclude(pk=self.instance.pk).exists():
+            raise serializers.ValidationError('Este e-mail já está em uso por outro cadastro.')
+        return valor
+
+    def validate_whatsapp(self, valor):
+        return normalizar_whatsapp(valor)
+
+    def update(self, usuario, dados):
+        if 'get_full_name' in dados:
+            primeiro, _, resto = dados.pop('get_full_name').strip().partition(' ')
+            usuario.first_name, usuario.last_name = primeiro, resto.strip()
+        if 'email' in dados:
+            usuario.username = dados['email']
+        return super().update(usuario, dados)
 
 
 class PreCadastroSerializer(serializers.Serializer):
@@ -109,11 +134,7 @@ class PreCadastroSerializer(serializers.Serializer):
         return valor
 
     def validate_whatsapp(self, valor):
-        d = re.sub(r'\D', '', valor)
-        d = d[2:] if len(d) == 13 and d.startswith('55') else d
-        if not re.fullmatch(r'\d{2}9\d{8}', d):
-            raise serializers.ValidationError('Informe o celular com DDD, ex.: (11) 99999-8888.')
-        return f'+55{d}'
+        return normalizar_whatsapp(valor)
 
     def validate_cpf(self, valor):
         d = re.sub(r'\D', '', valor)

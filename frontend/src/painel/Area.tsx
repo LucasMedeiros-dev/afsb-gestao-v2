@@ -1,24 +1,29 @@
 /**
  * Área do associado (/area): extrato e pagamento online, lojas, dados,
- * parceiros e documentos. Tudo leitura, exceto "pagar".
+ * parceiros e documentos. O associado paga e edita o próprio cadastro e as
+ * próprias lojas; o resto é leitura.
  */
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type InputHTMLAttributes, type ReactNode } from 'react';
 import { WHATSAPP_URL } from '../dadosInstitucionais';
-import { get, req, verComo, type Competencia } from './api';
+import { ErroApi, get, req, verComo, type Competencia } from './api';
 import Casca, { type GrupoMenu } from './Casca';
+import { OPCOES_COMUNICACAO, OPCOES_UF, STATUS_USUARIO, mascaraCep } from './recursos';
 import {
   Aviso,
   Botao,
   CLASSE_INPUT,
+  Campo,
   Carregando,
   Cartao,
   Icone,
   Modal,
+  Selo,
   SeloSituacao,
   Vazio,
   copiar,
   dataBR,
   moeda,
+  navegar,
   useCarregar,
   useToast,
 } from './ui';
@@ -61,8 +66,8 @@ export default function Area() {
       {(rota, _busca, usuario) => {
         let pagina;
         switch (rota) {
-          case 'lojas': pagina = <Lojas />; break;
-          case 'dados': pagina = <Dados />; break;
+          case 'lojas': pagina = <Lojas editavel={!alvo} />; break;
+          case 'dados': pagina = <Dados editavel={!alvo} />; break;
           case 'parceiros': pagina = <Parceiros />; break;
           case 'documentos': pagina = <Documentos />; break;
           default: pagina = <Pagamentos primeiroNome={(alvo?.nome ?? usuario.nome).split(' ')[0]} podePagar={!alvo} />;
@@ -328,6 +333,98 @@ function Pagar({ competencia, onFechar }: { competencia: Competencia; onFechar: 
   );
 }
 
+// ---------- edição (dados e lojas) ----------
+
+type Form = Record<string, string>;
+
+/** Estado de um formulário de edição: valores, erros por campo e o PATCH. */
+function useEdicao(rota: string, aoSalvar: () => void) {
+  const avisar = useToast();
+  const [form, setForm] = useState<Form | null>(null);
+  const [erros, setErros] = useState<Form>({});
+  const [salvando, setSalvando] = useState(false);
+
+  const mudar = (campo: string, valor: string) => {
+    setForm((f) => f && { ...f, [campo]: valor });
+    setErros((e) => ({ ...e, [campo]: '' }));
+  };
+  const abrir = (inicial: Form | null) => {
+    setForm(inicial);
+    setErros({});
+  };
+  const salvar = async () => {
+    if (!form) return;
+    setSalvando(true);
+    try {
+      await req('PATCH', rota, form);
+      avisar('Alterações salvas.');
+      setForm(null);
+      aoSalvar();
+    } catch (e) {
+      if (e instanceof ErroApi) setErros(e.campos);
+      avisar((e as Error).message, 'erro');
+    } finally {
+      setSalvando(false);
+    }
+  };
+  return { form, erros, salvando, mudar, abrir, salvar };
+}
+
+function Entrada({
+  rotulo,
+  campo,
+  edicao,
+  className = '',
+  mascara,
+  ...props
+}: {
+  rotulo: string;
+  campo: string;
+  edicao: ReturnType<typeof useEdicao>;
+  className?: string;
+  mascara?: (v: string) => string;
+} & Omit<InputHTMLAttributes<HTMLInputElement>, 'className'>) {
+  return (
+    <Campo rotulo={rotulo} erro={edicao.erros[campo]} className={className}>
+      <input
+        className={CLASSE_INPUT}
+        value={edicao.form?.[campo] ?? ''}
+        onChange={(e) => edicao.mudar(campo, mascara ? mascara(e.target.value) : e.target.value)}
+        {...props}
+      />
+    </Campo>
+  );
+}
+
+function Selecao({
+  rotulo,
+  campo,
+  edicao,
+  opcoes,
+  className = '',
+}: {
+  rotulo: string;
+  campo: string;
+  edicao: ReturnType<typeof useEdicao>;
+  opcoes: { valor: string; rotulo: string }[];
+  className?: string;
+}) {
+  return (
+    <Campo rotulo={rotulo} erro={edicao.erros[campo]} className={className}>
+      <select className={CLASSE_INPUT} value={edicao.form?.[campo] ?? ''} onChange={(e) => edicao.mudar(campo, e.target.value)}>
+        {opcoes.map((o) => (
+          <option key={o.valor} value={o.valor}>{o.rotulo}</option>
+        ))}
+      </select>
+    </Campo>
+  );
+}
+
+const mascaraFone = (v: string) => {
+  const d = v.replace(/\D/g, '').replace(/^55(?=\d{11})/, '').slice(0, 11);
+  return d.replace(/^(\d{2})(\d)/, '($1) $2').replace(/(\d{5})(\d{1,4})$/, '$1-$2');
+};
+
 // ---------- lojas ----------
 
 interface Franquia {
@@ -346,8 +443,23 @@ interface Franquia {
   socios: string[];
 }
 
-function Lojas() {
-  const { dados, erro } = useCarregar(() => get<Franquia[]>('/franquia/minhas/'), []);
+function Lojas({ editavel }: { editavel: boolean }) {
+  const { dados, erro, recarregar } = useCarregar(() => get<Franquia[]>('/franquia/minhas/'), []);
+  const [editando, setEditando] = useState<Franquia | null>(null);
+  const edicao = useEdicao(`/franquia/minhas/${editando?.id}/`, () => {
+    setEditando(null);
+    recarregar();
+  });
+  const editar = (f: Franquia) => {
+    setEditando(f);
+    const { nome_fantasia, cep, rua, numero, complemento, bairro, cidade, estado } = f;
+    edicao.abrir({ nome_fantasia, cep, rua, numero, complemento: complemento ?? '', bairro, cidade, estado });
+  };
+  const fechar = () => {
+    setEditando(null);
+    edicao.abrir(null);
+  };
+
   if (erro) return <Erro mensagem={erro} />;
   return (
     <>
@@ -371,7 +483,7 @@ function Lojas() {
                   Loja {f.nro_da_loja}
                 </span>
               </div>
-              <dl className="space-y-2 font-body-sm text-body-sm">
+              <dl className="flex-1 space-y-2 font-body-sm text-body-sm">
                 <div className="flex gap-2">
                   <Icone nome="id_card" className="text-[18px] text-outline" />
                   <dd className="tabular-nums">{f.cnpj}</dd>
@@ -390,9 +502,41 @@ function Lojas() {
                   </div>
                 )}
               </dl>
+              {editavel && (
+                <Botao pequeno icone="edit" className="self-start" onClick={() => editar(f)}>Editar loja</Botao>
+              )}
             </Cartao>
           ))}
         </div>
+      )}
+
+      {editando && edicao.form && (
+        <Modal
+          titulo={`Editar loja ${editando.nro_da_loja}`}
+          subtitulo={`${editando.razao_social} · ${editando.cnpj}`}
+          largura="max-w-2xl"
+          onFechar={fechar}
+          rodape={
+            <>
+              <Botao variante="fantasma" onClick={fechar}>Cancelar</Botao>
+              <Botao variante="primario" icone="check" carregando={edicao.salvando} onClick={edicao.salvar}>Salvar</Botao>
+            </>
+          }
+        >
+          <div className="grid grid-cols-1 sm:grid-cols-6 gap-4">
+            <Entrada rotulo="Nome fantasia" campo="nome_fantasia" edicao={edicao} className="sm:col-span-6" />
+            <Entrada rotulo="CEP" campo="cep" edicao={edicao} mascara={mascaraCep} inputMode="numeric" className="sm:col-span-2" />
+            <Entrada rotulo="Rua" campo="rua" edicao={edicao} className="sm:col-span-4" />
+            <Entrada rotulo="Número" campo="numero" edicao={edicao} className="sm:col-span-2" />
+            <Entrada rotulo="Complemento" campo="complemento" edicao={edicao} className="sm:col-span-4" />
+            <Entrada rotulo="Bairro" campo="bairro" edicao={edicao} className="sm:col-span-2" />
+            <Entrada rotulo="Cidade" campo="cidade" edicao={edicao} className="sm:col-span-3" />
+            <Selecao rotulo="UF" campo="estado" edicao={edicao} opcoes={OPCOES_UF} className="sm:col-span-1" />
+          </div>
+          <p className="mt-4 font-body-sm text-[0.8rem] text-outline">
+            Nº da loja, CNPJ, razão social e sócios são alterados pela AFSB.
+          </p>
+        </Modal>
       )}
     </>
   );
@@ -408,53 +552,139 @@ interface MeusDados {
   nro_associado: number | null;
   status: string;
   status_display: string;
+  tipo_comunicacao: string;
   tipo_comunicacao_display: string;
   data_admissao: string | null;
   qtd_lojas: number;
 }
 
-function Dados() {
-  const { dados, erro } = useCarregar(() => get<MeusDados>('/usuario/me/dados/'), []);
+function Info({ rotulo, icone, children }: { rotulo: string; icone: string; children: ReactNode }) {
+  return (
+    <div className="flex items-center gap-3 min-w-0">
+      <span className="w-10 h-10 shrink-0 rounded-xl bg-surface-container flex items-center justify-center text-outline">
+        <Icone nome={icone} className="text-[20px]" />
+      </span>
+      <div className="min-w-0">
+        <dt className="font-body-sm text-[0.8rem] text-on-surface-variant">{rotulo}</dt>
+        <dd className="font-label-lg text-label-lg text-on-surface break-words">{children}</dd>
+      </div>
+    </div>
+  );
+}
+
+function Dados({ editavel }: { editavel: boolean }) {
+  const { dados, erro, recarregar } = useCarregar(() => get<MeusDados>('/usuario/me/dados/'), []);
+  const edicao = useEdicao('/usuario/me/dados/', recarregar);
   if (erro) return <Erro mensagem={erro} />;
-  const fone = dados?.whatsapp.replace(/^\+55(\d{2})(\d{5})(\d{4})$/, '($1) $2-$3') ?? '';
-  const linhas: [string, string, string][] = dados
-    ? [
-        ['Nome', dados.nome, 'person'],
-        ['E-mail de acesso', dados.email, 'mail'],
-        ['CPF', dados.cpf, 'id_card'],
-        ['WhatsApp', fone, 'call'],
-        ['Nº de associado', dados.nro_associado ? `#${dados.nro_associado}` : '—', 'tag'],
-        ['Associado desde', dataBR(dados.data_admissao), 'event'],
-        ['Comunicação por', dados.tipo_comunicacao_display, 'notifications'],
-        ['Lojas', String(dados.qtd_lojas), 'storefront'],
-      ]
-    : [];
+
+  const titulo = <Titulo titulo="Meus dados" descricao="Informações do seu cadastro na AFSB." />;
+  if (!dados) {
+    return (
+      <>
+        {titulo}
+        <Cartao><Carregando linhas={6} /></Cartao>
+      </>
+    );
+  }
+
+  const iniciais = dados.nome.split(' ').filter(Boolean).map((p) => p[0]).slice(0, 2).join('').toUpperCase();
+  const situacao = STATUS_USUARIO[dados.status];
+  const editar = () =>
+    edicao.abrir({
+      nome: dados.nome,
+      email: dados.email,
+      whatsapp: mascaraFone(dados.whatsapp),
+      tipo_comunicacao: dados.tipo_comunicacao,
+    });
+
   return (
     <>
-      <Titulo titulo="Meus dados" descricao="Informações do seu cadastro na AFSB." />
-      <Cartao className="max-w-2xl">
-        {!dados ? (
-          <Carregando linhas={6} />
-        ) : (
-          <>
-            <dl>
-              {linhas.map(([rotulo, valor, icone]) => (
-                <div key={rotulo} className="flex items-center gap-4 px-5 py-3.5 border-b border-outline-variant/30 last:border-0">
-                  <Icone nome={icone} className="text-[20px] text-outline" />
-                  <dt className="w-40 shrink-0 font-body-sm text-body-sm text-on-surface-variant">{rotulo}</dt>
-                  <dd className="min-w-0 font-label-lg text-label-lg text-on-surface break-words">{valor}</dd>
-                </div>
-              ))}
-            </dl>
-            <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-4 bg-surface-container-low rounded-b-2xl">
-              <span className="font-body-sm text-body-sm text-on-surface-variant">Algum dado errado ou desatualizado?</span>
-              <a className="inline-flex items-center gap-2 px-4 py-2 rounded-xl font-label-md text-label-md text-white bg-[#25D366] hover:brightness-95" href={WHATSAPP_URL} rel="noreferrer" target="_blank">
-                <Icone nome="chat" className="text-[16px]" /> Pedir alteração
-              </a>
+      {titulo}
+
+      <Cartao className="mb-6 p-6 flex flex-col lg:flex-row lg:items-center gap-6">
+        <div className="flex items-center gap-4 flex-1 min-w-0">
+          <span className="w-16 h-16 shrink-0 rounded-2xl bg-primary text-on-primary flex items-center justify-center font-headline-sm text-headline-sm font-bold">
+            {iniciais}
+          </span>
+          <div className="min-w-0">
+            <p className="font-headline-sm text-headline-sm font-bold text-on-surface truncate">{dados.nome}</p>
+            <p className="font-body-sm text-body-sm text-on-surface-variant truncate">{dados.email}</p>
+            {situacao && <div className="mt-2"><Selo tom={situacao.tom}>{situacao.rotulo}</Selo></div>}
+          </div>
+        </div>
+        <dl className="grid grid-cols-3 gap-4 lg:gap-10 lg:pl-10 lg:border-l border-outline-variant/40">
+          {(
+            [
+              ['Nº de associado', dados.nro_associado ? `#${dados.nro_associado}` : '—'],
+              ['Associado desde', dataBR(dados.data_admissao)],
+              ['Lojas', String(dados.qtd_lojas)],
+            ] as const
+          ).map(([rotulo, valor]) => (
+            <div key={rotulo}>
+              <dt className="font-body-sm text-[0.8rem] text-on-surface-variant">{rotulo}</dt>
+              <dd className="mt-0.5 font-headline-sm text-headline-sm font-bold text-on-surface tabular-nums">{valor}</dd>
             </div>
-          </>
-        )}
+          ))}
+        </dl>
       </Cartao>
+
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+        <Cartao className="xl:col-span-2">
+          <div className="flex items-center justify-between gap-3 px-6 pt-5 pb-4 border-b border-outline-variant/30">
+            <h2 className="font-label-lg text-label-lg text-on-surface">Dados pessoais</h2>
+            {editavel && !edicao.form && <Botao pequeno icone="edit" onClick={editar}>Editar</Botao>}
+          </div>
+          {edicao.form ? (
+            <div className="p-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <Entrada rotulo="Nome completo" campo="nome" edicao={edicao} autoComplete="name" className="md:col-span-2" />
+                <Entrada rotulo="E-mail de acesso" campo="email" edicao={edicao} type="email" autoComplete="email" />
+                <Entrada rotulo="WhatsApp" campo="whatsapp" edicao={edicao} mascara={mascaraFone} inputMode="tel" placeholder="(11) 99999-8888" />
+                <Selecao rotulo="Receber comunicados por" campo="tipo_comunicacao" edicao={edicao} opcoes={OPCOES_COMUNICACAO} />
+                <Campo rotulo="CPF" ajuda="Alterado somente pela AFSB.">
+                  <input className={CLASSE_INPUT} value={dados.cpf} disabled />
+                </Campo>
+              </div>
+              <div className="mt-6 flex flex-wrap justify-end gap-2">
+                <Botao variante="fantasma" onClick={() => edicao.abrir(null)}>Cancelar</Botao>
+                <Botao variante="primario" icone="check" carregando={edicao.salvando} onClick={edicao.salvar}>Salvar alterações</Botao>
+              </div>
+            </div>
+          ) : (
+            <dl className="p-6 grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
+              <Info rotulo="Nome" icone="person">{dados.nome}</Info>
+              <Info rotulo="E-mail de acesso" icone="mail">{dados.email}</Info>
+              <Info rotulo="CPF" icone="id_card">{dados.cpf}</Info>
+              <Info rotulo="WhatsApp" icone="call">{mascaraFone(dados.whatsapp)}</Info>
+              <Info rotulo="Comunicação por" icone="notifications">{dados.tipo_comunicacao_display}</Info>
+            </dl>
+          )}
+        </Cartao>
+
+        <Cartao className="p-6 flex flex-col gap-4">
+          <span className="w-10 h-10 rounded-xl bg-surface-container flex items-center justify-center text-outline">
+            <Icone nome="support_agent" className="text-[20px]" />
+          </span>
+          <div>
+            <h2 className="font-label-lg text-label-lg text-on-surface">Outros ajustes</h2>
+            <p className="mt-1 font-body-sm text-body-sm text-on-surface-variant">
+              CPF, número de associado e lojas vinculadas são alterados pela AFSB. Endereço e nome das lojas você edita em{' '}
+              <button type="button" className="text-primary font-semibold hover:underline" onClick={() => navegar('/area/lojas')}>
+                Minhas lojas
+              </button>
+              .
+            </p>
+          </div>
+          <a
+            className="mt-auto self-start inline-flex items-center gap-2 px-4 py-2 rounded-xl font-label-md text-label-md text-white bg-[#25D366] hover:brightness-95"
+            href={WHATSAPP_URL}
+            rel="noreferrer"
+            target="_blank"
+          >
+            <Icone nome="chat" className="text-[16px]" /> Falar com a AFSB
+          </a>
+        </Cartao>
+      </div>
     </>
   );
 }

@@ -1,6 +1,8 @@
 # Sistema de permissões customizado para usuários
 # 1. Admin or Read-Only
 
+from apps.franquia.models import Franquia
+from apps.usuario.ver_como import vendo_como
 from rest_framework.permissions import SAFE_METHODS, BasePermission
 
 
@@ -49,3 +51,25 @@ class AssociadoAtivo(BasePermission):
         if not (usuario and usuario.is_authenticated):
             return False
         return usuario.is_staff or usuario.status == 'ativo'
+
+
+class DonoDoCadastro(AssociadoAtivo):
+    """
+    Associado ativo lê e edita o próprio cadastro e as lojas em que é sócio.
+    No "ver como" o admin só lê: a edição vale sempre para quem está logado.
+    Utilizada em
+    - Meus dados, minhas franquias
+    """
+    message = 'Você só pode alterar o seu próprio cadastro e as suas lojas.'
+
+    def has_permission(self, request, view):
+        if not super().has_permission(request, view):
+            return False
+        return request.method in SAFE_METHODS or not vendo_como(request)
+
+    def has_object_permission(self, request, view, obj):
+        if request.method in SAFE_METHODS:
+            return True
+        if isinstance(obj, Franquia):
+            return obj.usuarios.filter(pk=request.user.pk).exists()
+        return obj.pk == request.user.pk

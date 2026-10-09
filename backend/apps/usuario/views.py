@@ -1,18 +1,16 @@
+from apps.utils.custom_permissions import DonoDoCadastro
 from django.db import transaction
 from django.db.models import Max
 from rest_framework import filters, status, viewsets
-from rest_framework.decorators import action
 from rest_framework.authtoken.models import Token
 from rest_framework.authtoken.views import ObtainAuthToken
+from rest_framework.decorators import action
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
 
-from apps.utils.custom_permissions import AssociadoAtivo
-
 from .models import AprovacaoCadastro, Usuario
-from .ver_como import usuario_alvo
 from .serializers import (
     AprovarSerializer,
     DecisaoSerializer,
@@ -24,6 +22,7 @@ from .serializers import (
     dados_sessao,
     hoje,
 )
+from .ver_como import usuario_alvo
 
 
 class LoginView(ObtainAuthToken):
@@ -87,10 +86,17 @@ class PreCadastroView(APIView):
 
 
 class MeusDadosView(APIView):
-    permission_classes = (AssociadoAtivo,)
+    permission_classes = (DonoDoCadastro,)
 
     def get(self, request):
         return Response(MeusDadosSerializer(usuario_alvo(request)).data)
+
+    def patch(self, request):
+        self.check_object_permissions(request, request.user)
+        dados = MeusDadosSerializer(request.user, data=request.data, partial=True)
+        dados.is_valid(raise_exception=True)
+        dados.save()
+        return Response(dados.data)
 
 
 class UsuarioViewSet(viewsets.ModelViewSet):

@@ -1,14 +1,13 @@
 from collections import Counter
 from urllib.error import URLError
 
+from apps.usuario.ver_como import usuario_alvo
+from apps.utils.custom_permissions import DonoDoCadastro
 from django.db.models import Count
 from rest_framework import filters, generics, status, viewsets
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
-
-from apps.usuario.ver_como import usuario_alvo
-from apps.utils.custom_permissions import AssociadoAtivo
 
 from . import opencnpj
 from .models import Franquia
@@ -37,11 +36,21 @@ class FranquiaViewSet(viewsets.ModelViewSet):
 class MinhasFranquiasView(generics.ListAPIView):
     """Lojas do associado logado."""
     serializer_class = MinhaFranquiaSerializer
-    permission_classes = (AssociadoAtivo,)
+    permission_classes = (DonoDoCadastro,)
     pagination_class = None
 
     def get_queryset(self):
         return usuario_alvo(self.request).franquias.prefetch_related('usuarios')
+
+
+class MinhaFranquiaView(generics.UpdateAPIView):
+    """Associado edita uma loja em que é sócio (nome fantasia e endereço)."""
+    serializer_class = MinhaFranquiaSerializer
+    permission_classes = (DonoDoCadastro,)
+    http_method_names = ('patch', 'options')
+
+    def get_queryset(self):
+        return self.request.user.franquias.prefetch_related('usuarios')
 
 
 class ConsultaCnpjView(APIView):

@@ -19,7 +19,7 @@ export const mascaraCnpj = (v: string) =>
     .replace(/(\d{4})(\d)/, '$1-$2');
 
 const mascaraCpfCnpj = (v: string) => (digitos(v).length > 11 ? mascaraCnpj(v) : mascaraCpf(v));
-const mascaraCep = (v: string) => digitos(v).slice(0, 8).replace(/(\d{5})(\d)/, '$1-$2');
+export const mascaraCep = (v: string) => digitos(v).slice(0, 8).replace(/(\d{5})(\d)/, '$1-$2');
 /** Formato exigido pelo model: +55 + DDD + 9 dígitos, sem espaços. */
 const mascaraWhatsapp = (v: string) => {
   const d = digitos(v);
@@ -39,8 +39,8 @@ export const STATUS_USUARIO: Record<string, { rotulo: string; tom: Tom }> = {
 };
 const OPCOES_STATUS = op(Object.entries(STATUS_USUARIO).map(([k, v]) => [k, v.rotulo]));
 const OPCOES_CARGO = op([['franqueado', 'Franqueado'], ['admin', 'Administrador']]);
-const OPCOES_COMUNICACAO = op([['whatsapp_email', 'WhatsApp e e-mail'], ['whatsapp', 'WhatsApp'], ['email', 'E-mail']]);
-const OPCOES_UF = op(
+export const OPCOES_COMUNICACAO = op([['whatsapp_email', 'WhatsApp e e-mail'], ['whatsapp', 'WhatsApp'], ['email', 'E-mail']]);
+export const OPCOES_UF = op(
   'AC AL AM AP BA CE DF ES GO MA MG MS MT PA PB PE PI PR RJ RN RO RR RS SC SE SP TO'.split(' ').map((uf) => [uf, uf]),
 );
 export const FORMAS_PAGAMENTO: Record<string, string> = {

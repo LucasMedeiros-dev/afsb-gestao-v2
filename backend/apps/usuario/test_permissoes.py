@@ -14,16 +14,15 @@ import tempfile
 import uuid
 from datetime import date
 
-from django.core.files.uploadedfile import SimpleUploadedFile
-from django.test import TestCase, override_settings
-from rest_framework.test import APIClient
-
 from apps.cobranca import servicos
 from apps.cobranca.models import PerfilCobranca, TabelaValor
 from apps.documento.models import Documento
 from apps.evento.models import Evento
 from apps.franquia.models import Franquia
 from apps.usuario.models import Usuario
+from django.core.files.uploadedfile import SimpleUploadedFile
+from django.test import TestCase, override_settings
+from rest_framework.test import APIClient
 
 ARMAZENAMENTO_LOCAL = {
     'default': {'BACKEND': 'django.core.files.storage.FileSystemStorage', 'OPTIONS': {'location': tempfile.mkdtemp()}},
@@ -105,6 +104,43 @@ class MatrizPermissoesTests(TestCase):
         loja = c.get('/franquia/minhas/').json()[0]
         # Vê o nome dos sócios da própria loja, mas não os ids internos deles.
         self.assertNotIn('usuarios', loja)
+
+    def test_associado_edita_proprio_cadastro_e_lojas(self):
+        self.conferir('patch', '/usuario/me/dados/', dict(anonimo=N, assoc=P, bloq=N, admin=P))
+        self.conferir('patch', f'/franquia/minhas/{self.loja.id}/', dict(anonimo=N, assoc=P, bloq=N, admin=P))
+        c = self.cliente('assoc')
+        r = c.patch('/usuario/me/dados/', {
+            'nome': 'João Silva', 'whatsapp': '(11) 98888-7777', 'email': 'Novo@Loja.com',
+            'cpf': '000.000.000-00', 'status': 'bloqueado', 'nro_associado': 99,
+        }, format='json')
+        self.assertEqual(r.status_code, 200, r.content)
+        self.assoc.refresh_from_db()
+        self.assertEqual(
+            (self.assoc.first_name, self.assoc.last_name, self.assoc.whatsapp, self.assoc.email, self.assoc.username),
+            ('João', 'Silva', '+5511988887777', 'novo@loja.com', 'novo@loja.com'),
+        )
+        # CPF, status e nº de associado ficam com a AFSB.
+        self.assertEqual((self.assoc.cpf, self.assoc.status, self.assoc.nro_associado), ('529.982.247-25', 'ativo', 10))
+        self.assertEqual(c.patch('/usuario/me/dados/', {'email': 'maria@loja.com'}, format='json').status_code, 400)
+
+        r = c.patch(f'/franquia/minhas/{self.loja.id}/', {'nome_fantasia': 'Nova', 'cep': '01310100', 'cnpj': 'x', 'nro_da_loja': 7}, format='json')
+        self.assertEqual(r.status_code, 200, r.content)
+        self.loja.refresh_from_db()
+        self.assertEqual((self.loja.nome_fantasia, self.loja.cep, self.loja.cnpj, self.loja.nro_da_loja), ('Nova', '01310-100', '11.222.333/0001-81', 1))
+
+    def test_associado_nao_edita_loja_de_outro_nem_admin_vendo_como(self):
+        alheia = Franquia.objects.create(
+            nro_da_loja=2, nome_fantasia='B', razao_social='B', cnpj='11.444.777/0001-61', estado='SP',
+            cidade='SP', bairro='C', rua='R', numero='1', cep='01001-000',
+        )
+        alheia.usuarios.add(self.outro)
+        self.assertEqual(self.cliente('assoc').patch(f'/franquia/minhas/{alheia.id}/', {'nome_fantasia': 'X'}, format='json').status_code, 404)
+        # Ver como é só leitura: nem o cadastro do associado nem o do admin mudam.
+        admin = self.cliente('admin')
+        self.assertEqual(admin.patch('/usuario/me/dados/', {'nome': 'X'}, format='json', HTTP_X_VER_COMO=str(self.assoc.id)).status_code, 403)
+        self.assertEqual(admin.patch(f'/franquia/minhas/{alheia.id}/', {'nome_fantasia': 'X'}, format='json', HTTP_X_VER_COMO=str(self.outro.id)).status_code, 403)
+        alheia.refresh_from_db()
+        self.assertEqual(alheia.nome_fantasia, 'B')
 
     def test_rotas_administrativas(self):
         u, perfil = self.outro.id, PerfilCobranca.objects.get().id
