@@ -3,7 +3,43 @@ from decimal import Decimal
 from rest_framework import serializers
 
 from . import servicos
-from .models import Cobranca, Competencia, PerfilCobranca, RecebimentoExterno
+from .models import Cobranca, Competencia, PerfilCobranca, RecebimentoExterno, TabelaValor
+
+
+class TabelaValorSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = TabelaValor
+        fields = ('id', 'modalidade', 'qtd_lojas', 'valor_cheio', 'valor_desconto', 'data_atualizacao')
+
+
+class LinhaTabelaSerializer(serializers.Serializer):
+    qtd_lojas = serializers.IntegerField(min_value=1, max_value=999)
+    valor_cheio = serializers.DecimalField(max_digits=10, decimal_places=2, min_value=Decimal('0.01'))
+    valor_desconto = serializers.DecimalField(
+        max_digits=10, decimal_places=2, min_value=Decimal('0.01'), required=False, allow_null=True
+    )
+
+
+class SalvarTabelaSerializer(serializers.Serializer):
+    """Tabela inteira de uma modalidade: o que não vier na lista é removido."""
+
+    modalidade = serializers.ChoiceField(choices=TabelaValor.Modalidade.choices)
+    linhas = LinhaTabelaSerializer(many=True, allow_empty=False)
+
+    def validate(self, dados):
+        qtds = [l['qtd_lojas'] for l in dados['linhas']]
+        if len(qtds) != len(set(qtds)):
+            raise serializers.ValidationError({'linhas': 'Quantidade de lojas repetida.'})
+        for l in dados['linhas']:
+            if dados['modalidade'] == TabelaValor.Modalidade.ANUAL:
+                l['valor_desconto'] = None  # Anual (cartão) não tem desconto.
+            elif not l.get('valor_desconto'):
+                raise serializers.ValidationError({'linhas': f"{l['qtd_lojas']} loja(s): informe o valor com desconto."})
+            elif l['valor_desconto'] > l['valor_cheio']:
+                raise serializers.ValidationError(
+                    {'linhas': f"{l['qtd_lojas']} loja(s): valor com desconto maior que o valor normal."}
+                )
+        return dados
 
 
 class PerfilCobrancaSerializer(serializers.ModelSerializer):

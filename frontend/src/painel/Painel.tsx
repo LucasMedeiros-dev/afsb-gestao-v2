@@ -6,6 +6,7 @@ import Cobrancas from './Cobrancas';
 import Crud, { type Recurso } from './Crud';
 import Dashboard from './Dashboard';
 import * as recursos from './recursos';
+import TabelaValores from './TabelaValores';
 import { Icone } from './ui';
 
 const CRUDS: Record<string, Recurso> = {
@@ -26,6 +27,7 @@ const menu = (pendentes: number): GrupoMenu[] => [
       { rota: '', rotulo: 'Pagamentos', icone: 'monitoring' },
       { rota: 'cobrancas', rotulo: 'Cobranças', icone: 'receipt_long' },
       { rota: 'perfis', rotulo: 'Perfis de cobrança', icone: 'account_balance_wallet' },
+      { rota: 'tabela', rotulo: 'Tabela de valores', icone: 'price_change' },
     ],
   },
   {
@@ -78,6 +80,7 @@ export default function Painel() {
         if (rota === '') return <Dashboard />;
         if (rota === 'cobrancas') return <Cobrancas busca={busca} />;
         if (rota === 'aprovacoes') return <Aprovacoes />;
+        if (rota === 'tabela') return <TabelaValores />;
         return <Crud key={rota + busca.toString()} recurso={CRUDS[rota]} filtrosIniciais={Object.fromEntries(busca.entries())} />;
       }}
     </Casca>

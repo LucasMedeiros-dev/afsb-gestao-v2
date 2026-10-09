@@ -137,6 +137,29 @@ class PainelAdminTests(TestCase):
         )
 
     @override_settings(COBRANCA_EMISSAO_LIBERADA=False)
+    def test_tabela_de_valores(self):
+        url = '/cobranca/tabela/salvar/'
+        linha = lambda q, cheio, desc=None: {'qtd_lojas': q, 'valor_cheio': cheio, 'valor_desconto': desc}  # noqa: E731
+        self.assertEqual(self.api.post(url, {'modalidade': 'mensal', 'linhas': [linha(1, 130, 104)]}, format='json').status_code, 401)
+        self.api.force_authenticate(self.admin)
+
+        r = self.api.post(url, {'modalidade': 'mensal', 'linhas': [linha(1, 130, 104), linha(2, 180, 144)]}, format='json')
+        self.assertEqual(r.status_code, 200, r.content)
+        self.assertEqual([(l['qtd_lojas'], l['valor_cheio']) for l in r.json()], [(1, '130.00'), (2, '180.00')])
+        self.assertEqual(self.perfil.valores_vigentes(date(2026, 10, 15)), (Decimal('130.00'), Decimal('104.00')))
+        # Anual ignora desconto; mensal exige desconto <= normal e faixas sem repetição.
+        r = self.api.post(url, {'modalidade': 'anual', 'linhas': [linha(1, 1200, 999)]}, format='json')
+        self.assertIsNone(r.json()[0]['valor_desconto'])
+        for linhas in ([linha(1, 130)], [linha(1, 130, 140)], [linha(1, 130, 104), linha(1, 120, 96)]):
+            self.assertEqual(self.api.post(url, {'modalidade': 'mensal', 'linhas': linhas}, format='json').status_code, 400)
+        # Faixa usada por perfil ativo não pode sair; sem uso, sai.
+        r = self.api.post(url, {'modalidade': 'mensal', 'linhas': [linha(2, 180, 144)]}, format='json')
+        self.assertEqual(r.status_code, 400)
+        self.assertIn('1 loja(s)', r.json()['detail'])
+        r = self.api.post(url, {'modalidade': 'mensal', 'linhas': [linha(1, 130, 104)]}, format='json')
+        self.assertEqual(len(r.json()), 1)
+        self.assertEqual(len(self.api.get('/cobranca/tabela/').json()), 2)
+
     def test_trava_impede_emissao_e_geracao(self):
         comp, _ = servicos.gerar_competencia(self.perfil, date.today().year + 1, 1)
         with self.assertRaisesMessage(servicos.asaas.AsaasErro, 'não liberada'):

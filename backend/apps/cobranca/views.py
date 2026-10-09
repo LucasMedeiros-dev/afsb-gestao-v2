@@ -3,6 +3,7 @@ from datetime import date
 from decimal import Decimal
 
 from django.core.mail import send_mail
+from django.db import transaction
 from django.db.models import Q
 from rest_framework import filters, mixins, status, viewsets
 from rest_framework.decorators import action
@@ -15,17 +16,52 @@ from apps.usuario.ver_como import usuario_alvo, vendo_como
 from apps.utils.custom_permissions import AssociadoAtivo
 
 from . import asaas, servicos
-from .models import Cobranca, Competencia, PerfilCobranca
+from .models import Cobranca, Competencia, PerfilCobranca, TabelaValor
 from .serializers import (
     CompetenciaSerializer,
     PerfilCobrancaSerializer,
     ReceberSerializer,
     ReemitirSerializer,
+    SalvarTabelaSerializer,
+    TabelaValorSerializer,
 )
 
 
 def _erro(e):
     return Response({'detail': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+
+class TabelaValorViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
+    """Tabela padrão de valores. Mudança vale para as competências geradas depois; as já geradas mantêm o valor."""
+
+    queryset = TabelaValor.objects.all()
+    serializer_class = TabelaValorSerializer
+
+    @action(detail=False, methods=['post'])
+    def salvar(self, request):
+        entrada = SalvarTabelaSerializer(data=request.data)
+        entrada.is_valid(raise_exception=True)
+        modalidade, linhas = entrada.validated_data['modalidade'], entrada.validated_data['linhas']
+
+        atuais = TabelaValor.objects.filter(modalidade=modalidade)
+        removidas = set(atuais.values_list('qtd_lojas', flat=True)) - {l['qtd_lojas'] for l in linhas}
+        if removidas:
+            # Perfil ativo sem linha na tabela não gera cobrança (gerar_competencias pula).
+            parcelado = PerfilCobranca.FormaPagamento.CARTAO_PARCELADO
+            perfis = PerfilCobranca.objects.filter(ativo=True, qtd_lojas__in=removidas)
+            perfis = perfis.filter(forma_pagamento=parcelado) if modalidade == 'anual' else perfis.exclude(forma_pagamento=parcelado)
+            if em_uso := sorted(set(perfis.values_list('qtd_lojas', flat=True))):
+                faixas = ', '.join(f'{q} loja(s)' for q in em_uso)
+                return _erro(f'Não dá para remover {faixas}: há perfis de cobrança ativos nessa faixa.')
+
+        with transaction.atomic():
+            atuais.filter(qtd_lojas__in=removidas).delete()
+            for l in linhas:
+                TabelaValor.objects.update_or_create(
+                    modalidade=modalidade, qtd_lojas=l['qtd_lojas'],
+                    defaults={'valor_cheio': l['valor_cheio'], 'valor_desconto': l['valor_desconto']},
+                )
+        return Response(TabelaValorSerializer(TabelaValor.objects.filter(modalidade=modalidade), many=True).data)
 
 
 class PerfilCobrancaViewSet(viewsets.ModelViewSet):
